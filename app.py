@@ -2,173 +2,131 @@ import streamlit as st
 import pandas as pd
 import random
 import time
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import streamlit.components.v1 as components
 
-# --- 1. CONFIGURACIÓN DE LA PÁGINA ---
-st.set_page_config(page_title="Rifa TonyJM20 - The Ants", layout="wide")
+# --- 1. CONFIGURACIÓN ---
+st.set_page_config(page_title="Rifa TonyJM20", layout="wide")
 
-# --- 2. CONEXIÓN A GOOGLE SHEETS (BASE DE DATOS) ---
-def conectar_google_sheets():
-    try:
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        # Usa las credenciales guardadas en los Secrets de Streamlit
-        creds_dict = st.secrets["gcp_service_account"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client = gspread.authorize(creds)
-        # Debe coincidir exactamente con el nombre de tu archivo en Google Drive
-        return client.open("Rifa_TonyJM").sheet1
-    except Exception as e:
-        st.error(f"Error de conexión a Base de Datos: {e}")
-        return None
-
-# --- 3. INICIALIZACIÓN DE VARIABLES DE SESIÓN ---
+# Usamos la memoria del navegador para guardar los datos (Simple y sin errores)
+if 'participantes' not in st.session_state:
+    st.session_state.participantes = []
 if 'ganador' not in st.session_state:
     st.session_state.ganador = None
-
-# Configuración inicial de la rifa (Se puede cambiar en el Panel Admin)
 if 'config' not in st.session_state:
     st.session_state.config = {
         "meta": 50, 
         "precio": 10.0, 
-        "premio": "Insecto Especial (The Ants)", 
-        "client_id": "TU_CLIENT_ID_DE_PAYPAL" # <--- PEGA TU CLIENT ID AQUÍ
+        "premio": "Nuevo Insecto Especial",
+        "client_id": "TU_CLIENT_ID_AQUI" # <--- PEGA TU CLIENT ID AQUÍ
     }
 
-# --- 4. NAVEGACIÓN LATERAL ---
-st.sidebar.title("🎮 Menú de Rifa")
-menu = st.sidebar.radio("Ir a:", ["🎟️ Registro y Pago", "📺 Pantalla OBS (En Vivo)", "🔐 Panel Admin"])
+# --- 2. NAVEGACIÓN ---
+st.sidebar.title("🎮 Sorteo TonyJM")
+menu = st.sidebar.radio("Ir a:", ["🎟️ Registro y Pago", "📺 Pantalla Stream", "🔐 Admin"])
 
 # ==========================================
-# SECCIÓN 1: REGISTRO Y PAGO (USUARIO)
+# SECCIÓN 1: REGISTRO Y PAGO
 # ==========================================
 if menu == "🎟️ Registro y Pago":
     st.title(f"Participa por: {st.session_state.config['premio']}")
-    st.markdown(f"### Valor del Boleto: **${st.session_state.config['precio']} USD**")
     
-    st.info("Paso 1: Realiza el pago. Paso 2: Completa el formulario de abajo.")
+    col_pago, col_datos = st.columns([1, 1])
+    
+    with col_pago:
+        st.subheader("1. Pagar con PayPal o Tarjeta")
+        # Este bloque es el que genera los botones de PayPal y Tarjeta
+        paypal_html = f"""
+            <div id="paypal-button-container" style="width: 100%; min-height: 500px;"></div>
+            <script src="https://www.paypal.com/sdk/js?client-id={st.session_state.config['client_id']}&currency=USD"></script>
+            <script>
+                paypal.Buttons({{
+                    style: {{ layout: 'vertical', color: 'gold', shape: 'rect' }},
+                    createOrder: function(data, actions) {{
+                        return actions.order.create({{
+                            purchase_units: [{{ amount: {{ value: '{st.session_state.config["precio"]}' }} }}]
+                        }});
+                    }},
+                    onApprove: function(data, actions) {{
+                        return actions.order.capture().then(function(details) {{
+                            alert('¡Pago de ' + details.payer.name.given_name + ' exitoso! Ahora llena tus datos a la derecha.');
+                        }});
+                    }}
+                }}).render('#paypal-button-container');
+            </script>
+        """
+        components.html(paypal_html, height=550, scrolling=True)
 
-    # --- BOTONES DE PAYPAL Y TARJETA ---
-    paypal_html = f"""
-        <div id="paypal-button-container" style="width: 100%; min-height: 500px;"></div>
-        <script src="https://www.paypal.com/sdk/js?client-id={st.session_state.config['client_id']}&currency=USD&components=buttons"></script>
-        <script>
-            paypal.Buttons({{
-                style: {{ layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal' }},
-                createOrder: function(data, actions) {{
-                    return actions.order.create({{
-                        purchase_units: [{{ amount: {{ value: '{st.session_state.config["precio"]}' }} }}]
-                    }});
-                }},
-                onApprove: function(data, actions) {{
-                    return actions.order.capture().then(function(details) {{
-                        alert('¡Pago de ' + details.payer.name.given_name + ' exitoso! Ahora llena el formulario y dale a Registrarme.');
-                    }});
-                }}
-            }}).render('#paypal-button-container');
-        </script>
-    """
-    components.html(paypal_html, height=550, scrolling=True)
+    with col_datos:
+        st.subheader("2. Ingresa tus datos")
+        with st.form("form_registro"):
+            nombre = st.text_input("Nombre")
+            apellido = st.text_input("Apellido")
+            u_game = st.text_input("Usuario en el Juego")
+            id_game = st.text_input("ID de Cuenta")
+            email = st.text_input("Email")
+            
+            if st.form_submit_button("CONFIRMAR REGISTRO"):
+                if nombre and id_game:
+                    # Guardamos en la lista temporal
+                    nuevo = {"Nombre": nombre, "Apellido": apellido, "User": u_game, "ID": id_game, "Email": email, "Fecha": time.strftime("%H:%M")}
+                    st.session_state.participantes.append(nuevo)
+                    st.success("¡Registrado! Revisa la pantalla del stream.")
+                else:
+                    st.error("Faltan datos obligatorios.")
+
+# ==========================================
+# SECCIÓN 2: PANTALLA STREAM (OBS)
+# ==========================================
+elif menu == "📺 Pantalla Stream":
+    st.title(f"🏆 Sorteo: {st.session_state.config['premio']}")
+    
+    total = len(st.session_state.participantes)
+    meta = st.session_state.config['meta']
+    
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Boletos", f"{total} / {meta}")
+    c2.metric("Precio", f"${st.session_state.config['precio']}")
+    c3.progress(min(total/meta, 1.0) if meta > 0 else 0)
 
     st.divider()
-
-    # --- FORMULARIO DE REGISTRO ---
-    with st.form("registro_usuario"):
-        st.subheader("Datos del Participante")
-        c1, c2 = st.columns(2)
-        nombre = c1.text_input("Nombre")
-        apellido = c1.text_input("Apellido")
-        u_game = c2.text_input("Usuario en el Juego")
-        id_game = c2.text_input("ID de Cuenta")
-        email = st.text_input("Correo Electrónico (para contactarte)")
-        
-        btn_reg = st.form_submit_button("REGISTRARME EN LA RIFA")
-        
-        if btn_reg:
-            if nombre and id_game and email:
-                sheet = conectar_google_sheets()
-                if sheet:
-                    sheet.append_row([nombre, apellido, u_game, id_game, email, time.strftime("%Y-%m-%d %H:%M")])
-                    st.success("¡Registro Exitoso! Ya apareces en la pantalla de transmisión.")
-            else:
-                st.warning("Por favor, rellena todos los campos antes de registrarte.")
-
-# ==========================================
-# SECCIÓN 2: PANTALLA DE TRANSMISIÓN (OBS)
-# ==========================================
-elif menu == "📺 Pantalla OBS (En Vivo)":
-    st.title(f"🏆 Rifa: {st.session_state.config['premio']}")
     
-    sheet = conectar_google_sheets()
-    if sheet:
-        # Obtener datos y calcular progreso
-        datos = pd.DataFrame(sheet.get_all_records())
-        total_actual = len(datos)
-        meta = st.session_state.config['meta']
-        progreso = min(total_actual / meta, 1.0) if meta > 0 else 0
-        
-        # Métricas visuales
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Participantes", f"{total_actual} / {meta}")
-        m2.metric("Precio", f"${st.session_state.config['precio']}")
-        m3.metric("Faltan", max(0, meta - total_actual))
-        
-        st.write("**Progreso para el Sorteo:**")
-        st.progress(progreso)
-
-        st.divider()
-
-        col_izq, col_der = st.columns([2, 1])
-        
-        with col_izq:
-            st.subheader("📋 Lista de Participantes")
-            if not datos.empty:
-                st.table(datos[["Nombre", "Apellido"]].iloc[::-1].head(10)) # Muestra los últimos 10
-            else:
-                st.write("Esperando registros...")
-
-        with col_der:
-            st.subheader("🎲 ¡Sorteo!")
-            if st.button("🔥 GENERAR GANADOR 🔥", use_container_width=True):
-                if total_actual > 0:
-                    with st.spinner("Eligiendo ganador..."):
-                        time.sleep(3)
-                        # Elegir un ganador al azar de la tabla
-                        ganador_fila = datos.sample().iloc[0]
-                        st.session_state.ganador = ganador_fila
-                        st.balloons()
-                else:
-                    st.error("No hay participantes todavía.")
-            
-            if st.session_state.ganador is not None:
-                st.markdown(f"""
-                    <div style="background-color:#FFD700; padding:20px; border-radius:10px; text-align:center; color:black;">
-                        <h3>🏆 EL GANADOR ES:</h3>
-                        <h2>{st.session_state.ganador['Nombre']} {st.session_state.ganador['Apellido']}</h2>
-                    </div>
-                """, unsafe_allow_html=True)
-
-# ==========================================
-# SECCIÓN 3: PANEL ADMIN (PRIVADO)
-# ==========================================
-elif menu == "🔐 Panel Admin":
-    st.title("Administración")
-    pass_admin = st.text_input("Contraseña de Admin", type="password")
+    col_l, col_s = st.columns([2, 1])
+    with col_l:
+        st.subheader("👥 Participantes")
+        if st.session_state.participantes:
+            df = pd.DataFrame(st.session_state.participantes)
+            st.table(df[["Nombre", "Apellido"]].iloc[::-1].head(10))
     
-    if pass_admin == "TU_CLAVE_DE_ADMIN": # <--- CAMBIA ESTO
-        st.subheader("Ajustes del Sorteo")
-        st.session_state.config['premio'] = st.text_input("Nombre del Premio", st.session_state.config['premio'])
-        st.session_state.config['meta'] = st.number_input("Meta de Boletos", value=st.session_state.config['meta'])
-        st.session_state.config['precio'] = st.number_input("Precio del Boleto ($)", value=st.session_state.config['precio'])
+    with col_s:
+        st.subheader("🎲 Sorteo")
+        if st.button("🎰 TIRAR RULETA", use_container_width=True):
+            if total > 0:
+                with st.spinner("Eligiendo..."):
+                    time.sleep(3)
+                    st.session_state.ganador = random.choice(st.session_state.participantes)
+                    st.balloons()
         
-        if st.button("Borrar Ganador Actual"):
+        if st.session_state.ganador:
+            st.success(f"¡GANADOR: {st.session_state.ganador['Nombre']} {st.session_state.ganador['Apellido']}!")
+
+# ==========================================
+# SECCIÓN 3: ADMIN
+# ==========================================
+elif menu == "🔐 Admin":
+    contra = st.text_input("Clave", type="password")
+    if contra == "tonyjm": # <--- Tu clave
+        st.session_state.config['meta'] = st.number_input("Meta", value=st.session_state.config['meta'])
+        st.session_state.config['precio'] = st.number_input("Precio", value=st.session_state.config['precio'])
+        
+        if st.button("Reiniciar Rifa"):
+            st.session_state.participantes = []
             st.session_state.ganador = None
             st.rerun()
             
-        st.divider()
-        st.subheader("Ver Base de Datos (Google Sheets)")
-        sheet = conectar_google_sheets()
-        if sheet:
-            datos_completos = pd.DataFrame(sheet.get_all_records())
-            st.dataframe(datos_completos)
+        if st.session_state.participantes:
+            st.subheader("Descargar Datos")
+            df_admin = pd.DataFrame(st.session_state.participantes)
+            st.dataframe(df_admin)
+            # Botón para que descargues los datos y no los pierdas
+            csv = df_admin.to_csv(index=False).encode('utf-8')
+            st.download_button("Descargar Excel (CSV)", csv, "rifa.csv", "text/csv")
