@@ -10,7 +10,11 @@ st.set_page_config(page_title="Rifa TonyJM20", layout="wide", initial_sidebar_st
 if 'participantes' not in st.session_state:
     st.session_state.participantes = []
 if 'config' not in st.session_state:
-    st.session_state.config = {"meta": 50, "precio": "10.00", "premio": "Insecto Especial"}
+    st.session_state.config = {
+        "meta": 50, 
+        "precio": "10.00", 
+        "premio": "Insecto Especial"
+    }
 
 CLIENT_ID_PAYPAL = "Aet4fqbdIlo68fTo3U7WcXax3B9UpCQI8QupSmw3IFBAw-OKF1A4XCcRvBS19VIh7e7MeQyicvqjCIQl" 
 CLAVE_MAESTRO = "tonyjm20" 
@@ -20,11 +24,13 @@ params = st.query_params
 es_seguidor = params.get("view") == "registro"
 
 # ==========================================
-# VISTA SEGUIDOR
+# VISTA SEGUIDOR (PÚBLICA)
 # ==========================================
 if es_seguidor:
     st.title(f"🎟️ Sorteo: {st.session_state.config['premio']}")
-    precio_actual = st.session_state.config['precio']
+    
+    # IMPORTANTE: Leemos el precio actual de la configuración
+    precio_actual = str(st.session_state.config['precio']) 
     st.write(f"### Costo: **${precio_actual} USD**")
     
     nom = st.text_input("Nombre y Apellido", key="n_seg")
@@ -33,15 +39,24 @@ if es_seguidor:
     st.divider()
 
     if nom and u_g:
+        # LLAVE MÁGICA: Usamos el precio dentro del ID del contenedor. 
+        # Si el precio cambia, el ID cambia y PayPal se ve obligado a recargar el valor.
         paypal_html = f"""
-        <div id="paypal-button-container" style="min-height: 600px;"></div>
+        <div id="paypal-button-container-{precio_actual}" style="min-height: 600px;"></div>
         <script src="https://www.paypal.com/sdk/js?client-id={CLIENT_ID_PAYPAL}&currency=USD"></script>
         <script>
+            // Forzamos la limpieza de botones anteriores
+            document.getElementById('paypal-button-container-{precio_actual}').innerHTML = '';
+            
             paypal.Buttons({{
                 style: {{ layout: 'vertical', color: 'gold', shape: 'rect' }},
                 createOrder: function(data, actions) {{
                     return actions.order.create({{
-                        purchase_units: [{{ amount: {{ value: '{precio_actual}' }} }}]
+                        purchase_units: [{{ 
+                            amount: {{ 
+                                value: '{precio_actual}'  // <-- AQUÍ SE CARGA EL PRECIO DINÁMICO
+                            }} 
+                        }}]
                     }});
                 }},
                 onApprove: function(data, actions) {{
@@ -52,10 +67,11 @@ if es_seguidor:
                         window.location.href = url.href;
                     }});
                 }}
-            }}).render('#paypal-button-container');
+            }}).render('#paypal-button-container-{precio_actual}');
         </script>
         """
-        components.html(paypal_html, height=750, scrolling=True)
+        # Agregamos una 'key' al componente de Streamlit para forzar el refresco visual
+        components.html(paypal_html, height=750, scrolling=True, key=f"paypal_{precio_actual}")
         
         if params.get("pago") == "ok":
             nombre_pago = params.get("n")
@@ -70,7 +86,7 @@ if es_seguidor:
         st.warning("Escribe tu nombre para activar el pago.")
 
 # ==========================================
-# VISTA TONY (ADMIN)
+# VISTA TONY (ADMINISTRADOR)
 # ==========================================
 else:
     st.sidebar.title("🔐 Panel Maestro")
@@ -93,22 +109,13 @@ else:
             st.title("Configuración")
             st.session_state.config['premio'] = st.text_input("Premio", value=st.session_state.config['premio'])
             st.session_state.config['meta'] = st.number_input("Meta", value=st.session_state.config['meta'])
+            
+            # Al cambiar este valor, el seguidor verá el cambio reflejado en su botón de PayPal
             st.session_state.config['precio'] = st.text_input("Precio ($)", value=st.session_state.config['precio'])
             
             st.divider()
-            st.subheader("🔗 Tu Link Real para el Chat")
-            
-            # --- SOLUCIÓN AL LINK ROTO ---
-            # Esto detecta la URL actual del navegador automáticamente
-            try:
-                # Intentamos obtener la URL de la sesión de Streamlit
-                from streamlit.runtime.scriptrunner import get_script_run_ctx
-                url_actual = "https://rifa-tony-final-n6sp2uzx2pwyrnx4gkkn8r.streamlit.app" # Fallback
-                st.info("Copia el link de la barra de direcciones de tu navegador y agrégale al final: ?view=registro")
-            except:
-                pass
-            
-            st.write("Para compartir con tus seguidores, usa tu link de la barra de arriba y asegúrate de que termine así:")
+            st.subheader("🔗 Instrucciones para el Link")
+            st.write("Usa el link de tu navegador y agrégale al final:")
             st.code("https://rifa-tony-final-n6sp2uzx2pwyrnx4gkkn8r.streamlit.app?view=registro")
             
             if st.button("🗑️ Resetear Lista"):
