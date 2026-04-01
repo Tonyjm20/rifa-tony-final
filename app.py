@@ -4,18 +4,19 @@ import random
 import time
 import streamlit.components.v1 as components
 
-# --- 1. CONFIGURACIÓN E INTERFAZ ---
-st.set_page_config(page_title="Rifa TonyJM20", layout="wide", initial_sidebar_state="collapsed")
+# --- 1. CONFIGURACIÓN ---
+st.set_page_config(page_title="Rifa Automática TonyJM20", layout="wide", initial_sidebar_state="collapsed")
 
-# Memoria de la rifa (Se mantiene mientras TU pestaña de PC esté abierta)
+# Persistencia de datos en la sesión actual
 if 'participantes' not in st.session_state:
     st.session_state.participantes = []
 if 'ganador' not in st.session_state:
     st.session_state.ganador = None
 
-# --- CONFIGURACIÓN CRÍTICA ---
-CLIENT_ID_PAYPAL = "Aet4fqbdIlo68fTo3U7WcXax3B9UpCQI8QupSmw3IFBAw-OKF1A4XCcRvBS19VIh7e7MeQyicvqjCIQl" 
-CLAVE_MAESTRO = "tonyjm20" 
+# --- CONFIGURACIÓN TÉCNICA ---
+# RECUERDA: Pega tu Client ID real aquí
+CLIENT_ID_PAYPAL = "AQUÍ_PEGA_TU_CLIENT_ID_DE_PAYPAL" 
+CLAVE_MAESTRO = "tonyjm" 
 
 if 'config' not in st.session_state:
     st.session_state.config = {
@@ -24,38 +25,31 @@ if 'config' not in st.session_state:
         "premio": "Insecto Especial - The Ants"
     }
 
-# --- 2. EL FILTRO DE ENTRADA (AQUÍ ESTÁ LA SOLUCIÓN) ---
-# Revisamos la URL. Si contiene 'view=registro', es UN SEGUIDOR.
-query_params = st.query_params
-es_seguidor = query_params.get("view") == "registro"
+# --- 2. FILTRO DE VISTA ---
+params = st.query_params
+es_seguidor = params.get("view") == "registro"
 
 # ==========================================
-# BLOQUE A: INTERFAZ EXCLUSIVA PARA SEGUIDORES
+# VISTA SEGUIDOR (AUTOMATIZADA)
 # ==========================================
 if es_seguidor:
     st.title(f"🎟️ Sorteo: {st.session_state.config['premio']}")
-    st.info(f"Costo por participación: ${st.session_state.config['precio']} USD")
+    st.markdown(f"### Valor: **${st.session_state.config['precio']} USD**")
     
-    st.subheader("1. Datos de Registro")
-    c1, c2 = st.columns(2)
-    with c1:
-        nom = st.text_input("Nombre")
-        ape = st.text_input("Apellido")
-    with c2:
-        u_g = st.text_input("Usuario Juego")
-        id_g = st.text_input("ID Cuenta")
+    st.info("Escribe tus datos y paga. Al finalizar el pago, aparecerás automáticamente en el stream.")
     
-    mail = st.text_input("Correo Electrónico")
+    # Campos de datos
+    nom = st.text_input("Nombre y Apellido")
+    u_g = st.text_input("Usuario / ID del Juego")
 
     st.divider()
 
-    st.subheader("2. Pago con PayPal o Tarjeta")
-    if CLIENT_ID_PAYPAL == "AQUÍ_PEGA_TU_CLIENT_ID_DE_PAYPAL":
-        st.error("Error: PayPal no configurado.")
-    else:
-        paypal_code = f"""
-        <div id="paypal-button-container" style="display: flex; justify-content: center;"></div>
-        <script src="https://www.paypal.com/sdk/js?client-id={CLIENT_ID_PAYPAL}&currency=USD&components=buttons"></script>
+    if nom and u_g:
+        # SCRIPT DE PAYPAL CON AUTO-REGISTRO
+        # Este script detecta el pago y recarga la página enviando los datos a la URL
+        paypal_html = f"""
+        <div id="paypal-button-container"></div>
+        <script src="https://www.paypal.com/sdk/js?client-id={CLIENT_ID_PAYPAL}&currency=USD"></script>
         <script>
             paypal.Buttons({{
                 style: {{ layout: 'vertical', color: 'gold', shape: 'rect' }},
@@ -65,76 +59,75 @@ if es_seguidor:
                     }});
                 }},
                 onApprove: function(data, actions) {{
-                    return actions.order.capture().then(function(d) {{
-                        alert('¡Pago recibido con éxito!');
+                    return actions.order.capture().then(function(details) {{
+                        // Al pagar con éxito, redirigimos con los datos en la URL para que Python los guarde
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('pago', 'exitoso');
+                        url.searchParams.set('n', '{nom}');
+                        url.searchParams.set('id', '{u_g}');
+                        window.location.href = url.href;
                     }});
                 }}
             }}).render('#paypal-button-container');
         </script>
         """
-        components.html(paypal_code, height=500)
-
-    if st.button("✅ FINALIZAR REGISTRO", use_container_width=True):
-        if nom and id_g:
-            st.session_state.participantes.append({
-                "Nombre": nom, "Apellido": ape, "User": u_g, "ID": id_g, "Email": mail, "Hora": time.strftime("%H:%M")
-            })
-            st.success("¡Registrado! Ya apareces en el Stream.")
-        else:
-            st.error("Llena tus datos antes de finalizar.")
+        components.html(paypal_html, height=550)
+        
+        # LÓGICA DE CAPTURA POST-PAGO
+        # Si la URL contiene 'pago=exitoso', guardamos al usuario automáticamente
+        if params.get("pago") == "exitoso":
+            nuevo_nombre = params.get("n")
+            nuevo_id = params.get("id")
+            
+            # Verificamos si ya está para no duplicar al refrescar
+            existe = any(p['Nombre'] == nuevo_nombre for p in st.session_state.participantes)
+            if not existe:
+                st.session_state.participantes.append({
+                    "Nombre": nuevo_nombre,
+                    "ID": nuevo_id,
+                    "Hora": time.strftime("%H:%M")
+                })
+                st.success(f"¡Pago verificado! {nuevo_nombre}, ya estás en la lista.")
+                time.sleep(2)
+                # Limpiamos la URL para que no se duplique al refrescar manualmente
+                st.query_params.clear()
+                st.query_params.update({"view": "registro"})
+    else:
+        st.warning("⚠️ Debes completar tu Nombre e ID para habilitar el pago.")
 
 # ==========================================
-# BLOQUE B: INTERFAZ EXCLUSIVA PARA TONY (ADMIN)
+# VISTA TONY (ADMIN & STREAM)
 # ==========================================
 else:
-    # Si entran por el link normal (sin ?view=registro), pedimos clave
-    st.sidebar.title("🔐 Acceso TonyJM20")
-    acceso = st.sidebar.text_input("Contraseña", type="password")
-    
-    if acceso != CLAVE_MAESTRO:
-        st.title("🛡️ Panel de Control Protegido")
-        st.write("Ingresa tu clave en la barra lateral para gestionar la rifa.")
-    else:
+    st.sidebar.title("🔐 Panel Maestro")
+    if st.sidebar.text_input("Clave", type="password") == CLAVE_MAESTRO:
         menu = st.sidebar.radio("Ir a:", ["📺 Pantalla Stream", "⚙️ Ajustes"])
 
         if menu == "📺 Pantalla Stream":
-            st.title(f"🏆 Rifa: {st.session_state.config['premio']}")
+            st.title(f"🏆 Rifa en Vivo: {st.session_state.config['premio']}")
             total = len(st.session_state.participantes)
-            meta = st.session_state.config['meta']
-            
-            c1, c2 = st.columns(2)
-            c1.metric("Boletos Vendidos", f"{total} / {meta}")
-            c2.progress(min(total/meta, 1.0) if meta > 0 else 0)
+            st.metric("Participantes Automáticos", f"{total} / {st.session_state.config['meta']}")
             
             st.divider()
             if st.session_state.participantes:
                 df = pd.DataFrame(st.session_state.participantes)
-                st.table(df[["Nombre", "Apellido", "Hora"]].iloc[::-1].head(10))
+                st.table(df[["Nombre", "Hora"]].iloc[::-1])
+            else:
+                st.write("Esperando pagos...")
 
-            if st.button("🎰 SORTEAR AHORA"):
+            if st.button("🎰 SORTEAR"):
                 if total > 0:
                     st.session_state.ganador = random.choice(st.session_state.participantes)
                     st.balloons()
             
             if st.session_state.ganador:
-                st.success(f"¡GANADOR: {st.session_state.ganador['Nombre']} {st.session_state.ganador['Apellido']}!")
+                st.success(f"¡GANADOR: {st.session_state.ganador['Nombre']}!")
 
         elif menu == "⚙️ Ajustes":
-            st.title("Configuración y Links")
-            st.session_state.config['meta'] = st.number_input("Meta de boletos", value=st.session_state.config['meta'])
+            st.title("Configuración")
             st.session_state.config['precio'] = st.text_input("Precio ($)", value=st.session_state.config['precio'])
+            st.write(f"Link para seguidores: `https://rifa-tony-final-n6sp2uzx2pwyrnx4gkkn8r.streamlit.app`")
             
-            st.divider()
-            st.subheader("🔗 LINK PARA COMPARTIR EN EL CHAT")
-            
-            # Cambia esta URL por la tuya de Streamlit Cloud
-            url_base = "https://rifa-tony-final-n6sp2uzx2pwyrnx4gkkn8r.streamlit.app" 
-            link_para_chat = f"{url_base}?view=registro"
-            
-            st.code(link_para_chat)
-            st.info("Copia el link de arriba. Cualquier persona que use ese link entrará DIRECTO al registro sin ver el Admin.")
-
-            if st.button("🗑️ Borrar Participantes"):
+            if st.button("🗑️ Resetear Todo"):
                 st.session_state.participantes = []
-                st.session_state.ganador = None
                 st.rerun()
