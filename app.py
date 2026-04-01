@@ -16,8 +16,8 @@ if 'ganador' not in st.session_state:
     st.session_state.ganador = None
 
 # --- CONFIGURACIÓN TÉCNICA (EDITA ESTO) ---
-CLIENT_ID_PAYPAL = "AQUÍ_PEGA_TU_CLIENT_ID_DE_PAYPAL" 
-CLAVE_MAESTRO = "tonyjm" # Tu clave para entrar al panel
+CLIENT_ID_PAYPAL = "Aet4fqbdIlo68fTo3U7WcXax3B9UpCQI8QupSmw3IFBAw-OKF1A4XCcRvBS19VIh7e7MeQyicvqjCIQl" 
+CLAVE_MAESTRO = "tonyjm20" # Tu clave para entrar al panel
 
 if 'config' not in st.session_state:
     st.session_state.config = {
