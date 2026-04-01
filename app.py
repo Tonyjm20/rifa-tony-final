@@ -109,7 +109,7 @@ else:
                 pass
             
             st.write("Para compartir con tus seguidores, usa tu link de la barra de arriba y asegúrate de que termine así:")
-            st.code("?view=registro")
+            st.code("https://rifa-tony-final-n6sp2uzx2pwyrnx4gkkn8r.streamlit.app?view=registro")
             
             if st.button("🗑️ Resetear Lista"):
                 st.session_state.participantes = []
