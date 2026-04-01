@@ -12,7 +12,7 @@ if 'participantes' not in st.session_state:
 if 'ganador' not in st.session_state:
     st.session_state.ganador = None
 
-# --- CONFIGURACIÓN TÉCNICA (EDITA AQUÍ) ---
+# --- CONFIGURACIÓN TÉCNICA ---
 CLIENT_ID_PAYPAL = "Aet4fqbdIlo68fTo3U7WcXax3B9UpCQI8QupSmw3IFBAw-OKF1A4XCcRvBS19VIh7e7MeQyicvqjCIQl" 
 CLAVE_MAESTRO = "tonyjm20" 
 
@@ -28,11 +28,12 @@ params = st.query_params
 es_seguidor = params.get("view") == "registro"
 
 # ==========================================
-# VISTA SEGUIDOR (CON CORRECCIÓN DE ALTURA)
+# VISTA SEGUIDOR (PRECIO SINCRONIZADO)
 # ==========================================
 if es_seguidor:
     st.title(f"🎟️ Sorteo: {st.session_state.config['premio']}")
-    st.markdown(f"### Costo: **${st.session_state.config['precio']} USD**")
+    precio_actual = st.session_state.config['precio']
+    st.markdown(f"### Costo: **${precio_actual} USD**")
     
     st.info("Completa tus datos y paga. El registro es automático tras el pago.")
     
@@ -45,21 +46,24 @@ if es_seguidor:
     st.divider()
 
     if nom and u_g:
-        # Aumentamos el height a 800 para que el formulario de tarjeta quepa bien
+        # Usamos una clave única (key) basada en el precio para forzar el refresco del componente
+        # Si cambias el precio en Admin, este bloque se destruye y se crea de nuevo con el nuevo valor
         paypal_html = f"""
         <div id="paypal-button-container" style="width: 100%; min-height: 700px;"></div>
         <script src="https://www.paypal.com/sdk/js?client-id={CLIENT_ID_PAYPAL}&currency=USD&disable-funding=credit"></script>
         <script>
+            // Limpiamos el contenedor por si acaso
+            document.getElementById('paypal-button-container').innerHTML = '';
+            
             paypal.Buttons({{
-                style: {{ 
-                    layout: 'vertical', 
-                    color: 'gold', 
-                    shape: 'rect',
-                    label: 'pay'
-                }},
+                style: {{ layout: 'vertical', color: 'gold', shape: 'rect', label: 'pay' }},
                 createOrder: function(data, actions) {{
                     return actions.order.create({{
-                        purchase_units: [{{ amount: {{ value: '{st.session_state.config['precio']}' }} }}]
+                        purchase_units: [{{ 
+                            amount: {{ 
+                                value: '{precio_actual}' 
+                            }} 
+                        }}]
                     }});
                 }},
                 onApprove: function(data, actions) {{
@@ -74,7 +78,7 @@ if es_seguidor:
             }}).render('#paypal-button-container');
         </script>
         """
-        # El height aquí es clave para que no se corte en el móvil
+        # La 'key' en st.html o components.html es vital para que se actualice al cambiar el precio
         components.html(paypal_html, height=800, scrolling=True)
         
         if params.get("pago") == "ok":
@@ -128,6 +132,8 @@ else:
             st.title("Ajustes")
             st.session_state.config['premio'] = st.text_input("Premio", value=st.session_state.config['premio'])
             st.session_state.config['meta'] = st.number_input("Meta", value=st.session_state.config['meta'])
+            
+            # Al cambiar este valor, el seguidor verá el cambio reflejado en su botón de PayPal
             st.session_state.config['precio'] = st.text_input("Precio ($)", value=st.session_state.config['precio'])
             
             st.divider()
