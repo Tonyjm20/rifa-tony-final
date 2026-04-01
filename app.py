@@ -16,6 +16,7 @@ if 'config' not in st.session_state:
         "premio": "Insecto Especial"
     }
 
+# --- CONFIGURACIÓN TÉCNICA ---
 CLIENT_ID_PAYPAL = "Aet4fqbdIlo68fTo3U7WcXax3B9UpCQI8QupSmw3IFBAw-OKF1A4XCcRvBS19VIh7e7MeQyicvqjCIQl" 
 CLAVE_MAESTRO = "tonyjm20" 
 
@@ -24,39 +25,31 @@ params = st.query_params
 es_seguidor = params.get("view") == "registro"
 
 # ==========================================
-# VISTA SEGUIDOR (PÚBLICA)
+# VISTA SEGUIDOR (AUTOMATIZADA)
 # ==========================================
 if es_seguidor:
     st.title(f"🎟️ Sorteo: {st.session_state.config['premio']}")
+    p_actual = str(st.session_state.config['precio']).strip()
+    st.write(f"### Costo: **${p_actual} USD**")
     
-    # IMPORTANTE: Leemos el precio actual de la configuración
-    precio_actual = str(st.session_state.config['precio']) 
-    st.write(f"### Costo: **${precio_actual} USD**")
-    
-    nom = st.text_input("Nombre y Apellido", key="n_seg")
-    u_g = st.text_input("Usuario / ID Juego", key="i_seg")
+    # Formulario para evitar recargas constantes y errores de Type
+    with st.form("datos_pago"):
+        nom = st.text_input("Nombre y Apellido")
+        u_g = st.text_input("Usuario / ID Juego")
+        confirmar = st.form_submit_button("Habilitar Botones de Pago")
 
-    st.divider()
-
-    if nom and u_g:
-        # LLAVE MÁGICA: Usamos el precio dentro del ID del contenedor. 
-        # Si el precio cambia, el ID cambia y PayPal se ve obligado a recargar el valor.
+    if confirmar or (nom and u_g):
+        st.success("¡Datos listos! Elige tu método de pago abajo:")
+        
         paypal_html = f"""
-        <div id="paypal-button-container-{precio_actual}" style="min-height: 600px;"></div>
+        <div id="paypal-button-container" style="min-height: 600px;"></div>
         <script src="https://www.paypal.com/sdk/js?client-id={CLIENT_ID_PAYPAL}&currency=USD"></script>
         <script>
-            // Forzamos la limpieza de botones anteriores
-            document.getElementById('paypal-button-container-{precio_actual}').innerHTML = '';
-            
             paypal.Buttons({{
                 style: {{ layout: 'vertical', color: 'gold', shape: 'rect' }},
                 createOrder: function(data, actions) {{
                     return actions.order.create({{
-                        purchase_units: [{{ 
-                            amount: {{ 
-                                value: '{precio_actual}'  // <-- AQUÍ SE CARGA EL PRECIO DINÁMICO
-                            }} 
-                        }}]
+                        purchase_units: [{{ amount: {{ value: '{p_actual}' }} }}]
                     }});
                 }},
                 onApprove: function(data, actions) {{
@@ -67,23 +60,22 @@ if es_seguidor:
                         window.location.href = url.href;
                     }});
                 }}
-            }}).render('#paypal-button-container-{precio_actual}');
+            }}).render('#paypal-button-container');
         </script>
         """
-        # Agregamos una 'key' al componente de Streamlit para forzar el refresco visual
-        components.html(paypal_html, height=750, scrolling=True, key=f"paypal_{precio_actual}")
+        components.html(paypal_html, height=750, scrolling=True)
         
         if params.get("pago") == "ok":
             nombre_pago = params.get("n")
             if not any(p['Nombre'] == nombre_pago for p in st.session_state.participantes):
                 st.session_state.participantes.append({"Nombre": nombre_pago, "Hora": time.strftime("%H:%M")})
-                st.success(f"✅ ¡Registrado, {nombre_pago}!")
+                st.success(f"✅ ¡Pago verificado! {nombre_pago}, ya estás en la lista.")
                 st.balloons()
                 time.sleep(2)
                 st.query_params.clear()
                 st.query_params.update({"view": "registro"})
     else:
-        st.warning("Escribe tu nombre para activar el pago.")
+        st.warning("Completa el nombre para ver las opciones de PayPal y Tarjeta.")
 
 # ==========================================
 # VISTA TONY (ADMINISTRADOR)
@@ -96,28 +88,31 @@ else:
         if menu == "📺 Stream":
             st.title(f"🏆 Rifa: {st.session_state.config['premio']}")
             total = len(st.session_state.participantes)
-            st.metric("Vendidos", f"{total} / {st.session_state.config['meta']}")
+            st.metric("Participantes Reales", f"{total} / {st.session_state.config['meta']}")
+            
             if st.session_state.participantes:
                 st.table(pd.DataFrame(st.session_state.participantes)[["Nombre", "Hora"]].iloc[::-1])
+
             if st.button("🎰 SORTEAR"):
                 if total > 0:
                     ganador = random.choice(st.session_state.participantes)
-                    st.success(f"¡GANADOR: {ganador['Nombre']}!")
+                    st.success(f"¡EL GANADOR ES: {ganador['Nombre']}!")
                     st.balloons()
 
         elif menu == "⚙️ Ajustes":
-            st.title("Configuración")
+            st.title("Configuración de la Rifa")
             st.session_state.config['premio'] = st.text_input("Premio", value=st.session_state.config['premio'])
-            st.session_state.config['meta'] = st.number_input("Meta", value=st.session_state.config['meta'])
-            
-            # Al cambiar este valor, el seguidor verá el cambio reflejado en su botón de PayPal
+            st.session_state.config['meta'] = st.number_input("Meta de Boletos", value=st.session_state.config['meta'])
             st.session_state.config['precio'] = st.text_input("Precio ($)", value=st.session_state.config['precio'])
             
             st.divider()
-            st.subheader("🔗 Instrucciones para el Link")
-            st.write("Usa el link de tu navegador y agrégale al final:")
-            st.code("https://rifa-tony-final-n6sp2uzx2pwyrnx4gkkn8r.streamlit.app?view=registro")
             
-            if st.button("🗑️ Resetear Lista"):
+            # --- AQUÍ ESTÁ EL TEMA DEL LINK ---
+            st.subheader("🔗 Link para tus Seguidores")
+            st.write("Copia la URL de tu navegador y agrégale esto al final:")
+            st.code("https://rifa-tony-final-n6sp2uzx2pwyrnx4gkkn8r.streamlit.app?view=registro")
+            st.info("Ejemplo: https://tu-app.streamlit.app/?view=registro")
+            
+            if st.button("🗑️ Borrar Lista"):
                 st.session_state.participantes = []
                 st.rerun()
