@@ -151,7 +151,7 @@ elif menu == "🔐 Admin":
             # --- GENERADOR DE BOTÓN DE COPIAR ---
             # Intentamos obtener la URL actual automáticamente
             try:
-                url_base = "https://rifa-tony-final.streamlit.app/" # Reemplázala por tu URL real si es diferente
+                url_base = "https://rifa-tony-final-n6sp2uzx2pwyrnx4gkkn8r.streamlit.app" # Reemplázala por tu URL real si es diferente
                 link_publico = f"{url_base}?modo=registro"
                 
                 st.write(f"Link actual: `{link_publico}`")
