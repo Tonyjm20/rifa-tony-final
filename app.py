@@ -16,7 +16,6 @@ if 'ganador' not in st.session_state:
 CLIENT_ID_PAYPAL = "Aet4fqbdIlo68fTo3U7WcXax3B9UpCQI8QupSmw3IFBAw-OKF1A4XCcRvBS19VIh7e7MeQyicvqjCIQl" 
 CLAVE_MAESTRO = "tonyjm20" 
 
-# Mantenemos tus variables de control originales
 if 'config' not in st.session_state:
     st.session_state.config = {
         "meta": 50, 
@@ -29,15 +28,14 @@ params = st.query_params
 es_seguidor = params.get("view") == "registro"
 
 # ==========================================
-# VISTA SEGUIDOR (INTERFAZ ORIGINAL)
+# VISTA SEGUIDOR (CON CORRECCIÓN DE ALTURA)
 # ==========================================
 if es_seguidor:
     st.title(f"🎟️ Sorteo: {st.session_state.config['premio']}")
     st.markdown(f"### Costo: **${st.session_state.config['precio']} USD**")
     
-    st.info("Completa tus datos y realiza el pago para aparecer en la lista automáticamente.")
+    st.info("Completa tus datos y paga. El registro es automático tras el pago.")
     
-    # Tus campos de siempre
     c1, c2 = st.columns(2)
     with c1:
         nom = st.text_input("Nombre y Apellido")
@@ -47,13 +45,18 @@ if es_seguidor:
     st.divider()
 
     if nom and u_g:
-        # EL BOTÓN DE PAYPAL QUE HACE TODO EL TRABAJO
+        # Aumentamos el height a 800 para que el formulario de tarjeta quepa bien
         paypal_html = f"""
-        <div id="paypal-button-container"></div>
-        <script src="https://www.paypal.com/sdk/js?client-id={CLIENT_ID_PAYPAL}&currency=USD"></script>
+        <div id="paypal-button-container" style="width: 100%; min-height: 700px;"></div>
+        <script src="https://www.paypal.com/sdk/js?client-id={CLIENT_ID_PAYPAL}&currency=USD&disable-funding=credit"></script>
         <script>
             paypal.Buttons({{
-                style: {{ layout: 'vertical', color: 'gold', shape: 'rect' }},
+                style: {{ 
+                    layout: 'vertical', 
+                    color: 'gold', 
+                    shape: 'rect',
+                    label: 'pay'
+                }},
                 createOrder: function(data, actions) {{
                     return actions.order.create({{
                         purchase_units: [{{ amount: {{ value: '{st.session_state.config['precio']}' }} }}]
@@ -71,21 +74,20 @@ if es_seguidor:
             }}).render('#paypal-button-container');
         </script>
         """
-        components.html(paypal_html, height=550)
+        # El height aquí es clave para que no se corte en el móvil
+        components.html(paypal_html, height=800, scrolling=True)
         
-        # CAPTURA AUTOMÁTICA TRAS EL PAGO
         if params.get("pago") == "ok":
             n_pago = params.get("n")
             id_pago = params.get("id")
             
-            # Evitar duplicados por refresco de página
             if not any(p['Nombre'] == n_pago for p in st.session_state.participantes):
                 st.session_state.participantes.append({
                     "Nombre": n_pago,
                     "ID": id_pago,
                     "Hora": time.strftime("%H:%M")
                 })
-                st.success(f"✅ ¡Pago Verificado! Bienvenido a la rifa, {n_pago}.")
+                st.success(f"✅ ¡Pago Verificado! {n_pago}, estás en la lista.")
                 time.sleep(2)
                 st.query_params.clear()
                 st.query_params.update({"view": "registro"})
@@ -93,7 +95,7 @@ if es_seguidor:
         st.warning("⚠️ Escribe tu nombre e ID para habilitar el pago.")
 
 # ==========================================
-# VISTA TONY (INTERFAZ ORIGINAL)
+# VISTA TONY (ADMIN)
 # ==========================================
 else:
     st.sidebar.title("🔐 Panel Maestro")
@@ -105,7 +107,6 @@ else:
             total = len(st.session_state.participantes)
             meta = st.session_state.config['meta']
             
-            # Tus métricas de siempre
             c1, c2 = st.columns(2)
             c1.metric("Boletos Vendidos", f"{total} / {meta}")
             c2.progress(min(total/meta, 1.0) if meta > 0 else 0)
@@ -124,18 +125,16 @@ else:
                 st.success(f"¡EL GANADOR ES: {st.session_state.ganador['Nombre']}!")
 
         elif menu == "⚙️ Configuración":
-            st.title("Ajustes del Sorteo")
-            # He devuelto todos tus campos de control
-            st.session_state.config['premio'] = st.text_input("Nombre del Premio", value=st.session_state.config['premio'])
-            st.session_state.config['meta'] = st.number_input("Meta de Boletos (Número)", value=st.session_state.config['meta'])
-            st.session_state.config['precio'] = st.text_input("Precio por Boleto ($)", value=st.session_state.config['precio'])
+            st.title("Ajustes")
+            st.session_state.config['premio'] = st.text_input("Premio", value=st.session_state.config['premio'])
+            st.session_state.config['meta'] = st.number_input("Meta", value=st.session_state.config['meta'])
+            st.session_state.config['precio'] = st.text_input("Precio ($)", value=st.session_state.config['precio'])
             
             st.divider()
             st.subheader("🔗 Link para el Chat")
-            url_app = "https://rifa-tony-final-n6sp2uzx2pwyrnx4gkkn8r.streamlit.app" 
-            st.code(f"{url_app}?view=registro")
+            st.code("https://rifa-tony-final-n6sp2uzx2pwyrnx4gkkn8r.streamlit.app")
             
-            if st.button("🗑️ Resetear Lista de Participantes"):
+            if st.button("🗑️ Resetear Lista"):
                 st.session_state.participantes = []
                 st.session_state.ganador = None
                 st.rerun()
