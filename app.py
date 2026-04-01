@@ -16,8 +16,9 @@ if 'ganador' not in st.session_state:
     st.session_state.ganador = None
 
 # --- CONFIGURACIÓN TÉCNICA (EDITA ESTO) ---
+# RECUERDA: Pega aquí tu Client ID de PayPal (el código largo)
 CLIENT_ID_PAYPAL = "Aet4fqbdIlo68fTo3U7WcXax3B9UpCQI8QupSmw3IFBAw-OKF1A4XCcRvBS19VIh7e7MeQyicvqjCIQl" 
-CLAVE_MAESTRO = "tonyjm20" # Tu clave para entrar al panel
+CLAVE_MAESTRO = "tonyjm20" 
 
 if 'config' not in st.session_state:
     st.session_state.config = {
@@ -27,20 +28,17 @@ if 'config' not in st.session_state:
     }
 
 # --- 2. LÓGICA DE RUTEO (ADMIN vs PÚBLICO) ---
-# Detectamos si el usuario viene por el link compartido (?modo=registro)
 params = st.query_params
 es_publico = params.get("modo") == "registro"
 
 if es_publico:
-    # MODO PÚBLICO: Sin menú, directo al grano
     menu = "🎟️ Registro"
 else:
-    # MODO MAESTRO: Con menú lateral para Tony
     st.sidebar.title("🎮 Panel Maestro")
     menu = st.sidebar.radio("Navegar:", ["📺 Pantalla Stream", "🔐 Admin", "🎟️ Registro"])
 
 # ==========================================
-# VISTA 1: REGISTRO (Lo que ve el seguidor)
+# VISTA 1: REGISTRO (Seguidores)
 # ==========================================
 if menu == "🎟️ Registro":
     if not st.session_state.rifa_activa and es_publico:
@@ -49,7 +47,6 @@ if menu == "🎟️ Registro":
         st.title(f"🎟️ Sorteo: {st.session_state.config['premio']}")
         st.info(f"Costo del boleto: ${st.session_state.config['precio']} USD")
         
-        # PASO 1: DATOS
         st.subheader("1. Completa tus datos")
         c1, c2 = st.columns(2)
         with c1:
@@ -63,10 +60,9 @@ if menu == "🎟️ Registro":
 
         st.divider()
 
-        # PASO 2: PAGO
-        st.subheader("2. Realizar Pago (Tarjeta o PayPal)")
+        st.subheader("2. Realizar Pago")
         if CLIENT_ID_PAYPAL == "AQUÍ_PEGA_TU_CLIENT_ID_DE_PAYPAL":
-            st.error("Error: Client ID no configurado.")
+            st.error("Error: Client ID de PayPal no configurado.")
         else:
             paypal_code = f"""
             <div id="paypal-button-container" style="display: flex; justify-content: center;"></div>
@@ -94,15 +90,15 @@ if menu == "🎟️ Registro":
                 st.session_state.participantes.append({
                     "Nombre": nom, "Apellido": ape, "User": u_g, "ID": id_g, "Email": mail, "Hora": time.strftime("%H:%M")
                 })
-                st.success("¡Registrado! Ya apareces en la pantalla del Stream.")
+                st.success("¡Registrado! Revisa el Stream.")
             else:
                 st.error("Por favor, llena todos los campos.")
 
 # ==========================================
-# VISTA 2: PANTALLA STREAM (Para OBS)
+# VISTA 2: PANTALLA STREAM (OBS)
 # ==========================================
 elif menu == "📺 Pantalla Stream":
-    st.title(f"🏆 Rifa en Vivo: {st.session_state.config['premio']}")
+    st.title(f"🏆 Rifa: {st.session_state.config['premio']}")
     total = len(st.session_state.participantes)
     meta = st.session_state.config['meta']
     
@@ -120,52 +116,46 @@ elif menu == "📺 Pantalla Stream":
             st.table(df[["Nombre", "Apellido", "Hora"]].iloc[::-1].head(12))
     
     with c_win:
-        st.subheader("🎲 El Sorteo")
-        if st.button("🎰 ¡GIRAR!", use_container_width=True):
+        st.subheader("🎲 Sorteo")
+        if st.button("🎰 ¡GIRAR RULETA!", use_container_width=True):
             if total > 0:
-                with st.spinner("Eligiendo..."):
+                with st.spinner("Sorteando..."):
                     time.sleep(3)
                     st.session_state.ganador = random.choice(st.session_state.participantes)
                     st.balloons()
         
         if st.session_state.ganador:
-            st.markdown(f"""
-                <div style="background-color:#FFD700; padding:20px; border-radius:10px; text-align:center; color:black;">
-                    <h3>🏆 GANADOR:</h3>
-                    <h2>{st.session_state.ganador['Nombre']} {st.session_state.ganador['Apellido']}</h2>
-                </div>
-            """, unsafe_allow_html=True)
+            st.success(f"GANADOR: {st.session_state.ganador['Nombre']} {st.session_state.ganador['Apellido']}")
 
 # ==========================================
-# VISTA 3: ADMIN (Configuración)
+# VISTA 3: ADMIN
 # ==========================================
 elif menu == "🔐 Admin":
-    st.title("Panel de Control Maestro")
-    if st.text_input("Contraseña", type="password") == CLAVE_MAESTRO:
-        st.subheader("Configuración de la Rifa")
+    st.title("Panel Maestro")
+    # Entrada de contraseña
+    intento_clave = st.text_input("Contraseña", type="password")
+    
+    if intento_clave == CLAVE_MAESTRO:
+        st.subheader("Configuración")
         st.session_state.config['meta'] = st.number_input("Meta de Boletos", value=st.session_state.config['meta'])
         st.session_state.config['precio'] = st.text_input("Precio ($)", value=st.session_state.config['precio'])
         st.session_state.config['premio'] = st.text_input("Premio", value=st.session_state.config['premio'])
 
         st.divider()
         
-        # INTERRUPTOR DE RIFA
+        # EL BOTÓN QUE DABA ERROR (Ahora corregido sin el parámetro color)
         if not st.session_state.rifa_activa:
-            if st.button("🚀 ACTIVAR RIFA PARA EL PÚBLICO", color="green"):
+            if st.button("🚀 ACTIVAR RIFA PARA EL PÚBLICO"):
                 st.session_state.rifa_activa = True
                 st.rerun()
         else:
-            st.success("✅ La rifa está ACTIVA actualmente.")
-            # GENERADOR DE LINK
-            st.info(f"Copia este link para tus seguidores:\n\n `https://tu-app-url.streamlit.app/?modo=registro`")
+            st.success("✅ La rifa está ACTIVA.")
+            st.info("Link para seguidores: `URL-DE-TU-APP/?modo=registro`")
             if st.button("🛑 DESACTIVAR RIFA"):
                 st.session_state.rifa_activa = False
                 st.rerun()
 
-        if st.button("🗑️ Resetear Participantes"):
+        if st.button("🗑️ Resetear Datos"):
             st.session_state.participantes = []
             st.session_state.ganador = None
             st.rerun()
-
-        st.write("### Lista Completa")
-        st.dataframe(pd.DataFrame(st.session_state.participantes))
