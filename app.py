@@ -17,7 +17,7 @@ if 'config' not in st.session_state:
         "meta": 50, 
         "precio": "10.00", 
         "premio": "Insecto Especial - The Ants",
-        "client_id": "TU_CLIENT_ID_AQUI" # <--- PEGA AQUÍ TU CLIENT ID DE PAYPAL
+        "client_id": "Aet4fqbdIlo68fTo3U7WcXax3B9UpCQI8QupSmw3IFBAw-OKF1A4XCcRvBS19VIh7e7MeQyicvqjCIQl" # <--- PEGA AQUÍ TU CLIENT ID DE PAYPAL
     }
 
 # --- 2. NAVEGACIÓN ---
