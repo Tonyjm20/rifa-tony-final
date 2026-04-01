@@ -7,7 +7,7 @@ import streamlit.components.v1 as components
 # --- 1. CONFIGURACIÓN E INTERFAZ ---
 st.set_page_config(page_title="Rifa Oficial TonyJM20", layout="wide", initial_sidebar_state="collapsed")
 
-# Persistencia de datos (Memoria de sesión)
+# Persistencia de datos
 if 'participantes' not in st.session_state:
     st.session_state.participantes = []
 if 'rifa_activa' not in st.session_state:
@@ -16,7 +16,6 @@ if 'ganador' not in st.session_state:
     st.session_state.ganador = None
 
 # --- CONFIGURACIÓN TÉCNICA (EDITA ESTO) ---
-# RECUERDA: Pega aquí tu Client ID de PayPal (el código largo)
 CLIENT_ID_PAYPAL = "Aet4fqbdIlo68fTo3U7WcXax3B9UpCQI8QupSmw3IFBAw-OKF1A4XCcRvBS19VIh7e7MeQyicvqjCIQl" 
 CLAVE_MAESTRO = "tonyjm20" 
 
@@ -27,7 +26,7 @@ if 'config' not in st.session_state:
         "premio": "Insecto Especial - The Ants"
     }
 
-# --- 2. LÓGICA DE RUTEO (ADMIN vs PÚBLICO) ---
+# --- 2. LÓGICA DE RUTEO ---
 params = st.query_params
 es_publico = params.get("modo") == "registro"
 
@@ -42,7 +41,7 @@ else:
 # ==========================================
 if menu == "🎟️ Registro":
     if not st.session_state.rifa_activa and es_publico:
-        st.warning("⚠️ El sorteo aún no ha sido activado por TonyJM20. ¡Vuelve pronto!")
+        st.warning("⚠️ El sorteo aún no ha sido activado. ¡Vuelve pronto!")
     else:
         st.title(f"🎟️ Sorteo: {st.session_state.config['premio']}")
         st.info(f"Costo del boleto: ${st.session_state.config['precio']} USD")
@@ -128,11 +127,10 @@ elif menu == "📺 Pantalla Stream":
             st.success(f"GANADOR: {st.session_state.ganador['Nombre']} {st.session_state.ganador['Apellido']}")
 
 # ==========================================
-# VISTA 3: ADMIN
+# VISTA 3: ADMIN (Con botón de Copiar Link)
 # ==========================================
 elif menu == "🔐 Admin":
     st.title("Panel Maestro")
-    # Entrada de contraseña
     intento_clave = st.text_input("Contraseña", type="password")
     
     if intento_clave == CLAVE_MAESTRO:
@@ -143,14 +141,44 @@ elif menu == "🔐 Admin":
 
         st.divider()
         
-        # EL BOTÓN QUE DABA ERROR (Ahora corregido sin el parámetro color)
         if not st.session_state.rifa_activa:
             if st.button("🚀 ACTIVAR RIFA PARA EL PÚBLICO"):
                 st.session_state.rifa_activa = True
                 st.rerun()
         else:
             st.success("✅ La rifa está ACTIVA.")
-            st.info("Link para seguidores: `URL-DE-TU-APP/?modo=registro`")
+            
+            # --- GENERADOR DE BOTÓN DE COPIAR ---
+            # Intentamos obtener la URL actual automáticamente
+            try:
+                url_base = "https://rifa-tony-final.streamlit.app/" # Reemplázala por tu URL real si es diferente
+                link_publico = f"{url_base}?modo=registro"
+                
+                st.write(f"Link actual: `{link_publico}`")
+                
+                # Componente HTML para botón de copiar
+                copy_code = f"""
+                <button onclick="copyToClipboard()" style="padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    📋 Copiar Link para Seguidores
+                </button>
+                <p id="msg" style="color: green; font-size: 12px;"></p>
+
+                <script>
+                function copyToClipboard() {{
+                    const el = document.createElement('textarea');
+                    el.value = '{link_publico}';
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
+                    document.getElementById('msg').innerHTML = '¡Copiado al portapapeles!';
+                }}
+                </script>
+                """
+                components.html(copy_code, height=100)
+            except:
+                st.error("No se pudo generar el botón de copiar.")
+
             if st.button("🛑 DESACTIVAR RIFA"):
                 st.session_state.rifa_activa = False
                 st.rerun()
