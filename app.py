@@ -1,114 +1,97 @@
-import streamlit as st
+
+     import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-import random
 import time
+import random
 import streamlit.components.v1 as components
 
-# --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="Rifa Tony", layout="wide")
+# --- CONFIGURACIÓN ---
+st.set_page_config(page_title="Rifa Tony AFK", layout="wide")
 
-# SUSTITUYE ESTO POR TU ENLACE DE "PUBLICAR EN LA WEB" (EL QUE TERMINA EN .csv)
+# 1. Enlace de lectura pública (El que termina en .csv)
 LINK_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx5dTlNFD_aegJHRA_MTKHp3S6JAkgCQdUQaiLKlJpvdI5HpMqNZDDWHMlUvjPPHFqUzbSTy1xNpxg/pub?output=csv"
 ID_SHEET = "1zBwqiaFjT3RfnAA19BBE37AHFGaz6oQZM2C3aVJC2uE"
 CLAVE_ADMIN = "tonyjm20"
 CLIENT_ID_PAYPAL = "Aet4fqbdIlo68fTo3U7WcXax3B9UpCQI8QupSmw3IFBAw-OKF1A4XCcRvBS19VIh7e7MeQyicvqjCIQl"
 
-# --- 2. CONEXIÓN PARA ESCRITURA ---
+# 2. Conexión de escritura
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def leer_datos():
     try:
-        # VÍA RÁPIDA: Lee el CSV público (Evita el error 401)
-        # Añadimos un parámetro aleatorio para saltar el caché de Google
-        url_final = f"{LINK_CSV}&cache={random.randint(1,99999)}"
-        df = pd.read_csv(url_final)
-        # Limpiar espacios en nombres de columnas
+        url_fresca = f"{LINK_CSV}&cache={random.randint(1,99999)}"
+        df = pd.read_csv(url_fresca)
         df.columns = [c.strip() for c in df.columns]
         return df
-    except Exception as e:
-        # Si falla el link público, intenta la conexión interna
-        try:
-            return conn.read(worksheet="Hoja1", ttl=0)
-        except:
-            return pd.DataFrame(columns=["Nombre", "Apellido", "User", "ID", "Email", "Fecha"])
+    except:
+        return pd.DataFrame(columns=["Nombre", "Apellido", "User", "ID", "Email", "Fecha"])
 
-def registrar_pago(n, ape, u, i, em):
+def guardar_registro_forzado(n, ape, u, i, em):
     try:
-        # 1. Limpiamos los datos de espacios raros
-        n, ape, u, i, em = [str(x).strip() for x in [n, ape, u, i, em]]
-        
-        # 2. Obtenemos los datos actuales para no borrar nada
         df_actual = leer_datos()
-        
-        # 3. Creamos la nueva fila con la estructura exacta de tu Excel
         nueva_fila = pd.DataFrame([{
-            "Nombre": n, 
-            "Apellido": ape, 
-            "User": u, 
-            "ID": i, 
-            "Email": em, 
-            "Fecha": time.strftime("%d/%m/%Y %H:%M:%S")
+            "Nombre": n, "Apellido": ape, "User": u, 
+            "ID": i, "Email": em, "Fecha": time.strftime("%d/%m/%Y %H:%M:%S")
         }])
-        
-        # 4. Unimos y subimos (IMPORTANTE: Verifica que en Sheets la pestaña sea 'Hoja1')
         df_final = pd.concat([df_actual, nueva_fila], ignore_index=True)
-        
-        # Intentamos la actualización forzada
+        # Intentamos guardar directamente
         conn.update(worksheet="Hoja1", data=df_final)
-        
-        # 5. Limpiamos TODA la memoria para que el cambio se vea al instante
         st.cache_data.clear()
-        st.cache_resource.clear()
         return True
     except Exception as e:
-        # Si sale este error en tu consola, es que los Secrets (la llave) siguen mal
-        st.error(f"Error de escritura en Google Sheets: {e}")
+        st.error(f"Error técnico al guardar: {e}")
         return False
 
-# --- 3. LÓGICA DE NAVEGACIÓN ---
-if 'config' not in st.session_state:
-    st.session_state.config = {"meta": 25, "precio": "1.00", "premio": "Insecto sinergia V (35.000 monedas de hormiga)"}
-
+# --- LÓGICA DE NAVEGACIÓN ---
 params = st.query_params
 es_seguidor = params.get("view") == "registro"
 
-# ==========================================
-# VISTA SEGUIDOR (PAGO)
-# ==========================================
 if es_seguidor:
-    st.title(f"🎟️ Sorteo: {st.session_state.config['premio']}")
-    precio = st.session_state.config['precio']
+    st.header("🎟️ Registro para el Sorteo")
     
-    with st.form("registro"):
+    # Formulario de datos
+    with st.form("datos_usuario"):
         c1, c2 = st.columns(2)
         with c1:
-            nom = st.text_input("Nombre")
-            ap = st.text_input("Apellido")
-            cor = st.text_input("Email")
+            nombre = st.text_input("Nombre")
+            apellido = st.text_input("Apellido")
+            email = st.text_input("Email")
         with c2:
-            usr = st.text_input("User del Juego")
-            idx = st.text_input("ID del Juego")
-        validar = st.form_submit_button("Confirmar Datos")
+            usuario = st.text_input("User del Juego")
+            id_juego = st.text_input("ID del Juego")
+        
+        # EL CAMBIO CLAVE: El botón de registrar ahora guarda los datos PRIMERO
+        enviar_datos = st.form_submit_button("1. Registrar mis datos")
 
-    if validar or (nom and idx):
-        st.info(f"Paga ${precio} USD para completar tu inscripción:")
+    if enviar_datos:
+        if nombre and id_juego and email:
+            con exito = guardar_registro_forzado(nombre, apellido, usuario, id_juego, email)
+            if exito:
+                st.success("✅ Datos guardados. Ahora procede al pago para validar tu participación.")
+                st.session_state['datos_listos'] = True
+            else:
+                st.error("Hubo un problema al conectar con el Excel. Intenta de nuevo.")
+        else:
+            st.warning("Por favor, llena todos los campos.")
+
+    # 2. SECCIÓN DE PAGO (Solo aparece si se guardaron los datos)
+    if st.session_state.get('datos_listos'):
+        st.divider()
+        st.info("💰 Paso final: Realiza el pago de $10.00 USD")
+        
         paypal_html = f"""
         <div id="paypal-button-container"></div>
         <script src="https://www.paypal.com/sdk/js?client-id={CLIENT_ID_PAYPAL}&currency=USD"></script>
         <script>
             paypal.Buttons({{
                 createOrder: function(data, actions) {{
-                    return actions.order.create({{ purchase_units: [{{ amount: {{ value: '{precio}' }} }}] }});
+                    return actions.order.create({{ purchase_units: [{{ amount: {{ value: '10.00' }} }}] }});
                 }},
                 onApprove: function(data, actions) {{
                     return actions.order.capture().then(function(details) {{
-                        const url = new URL(window.location.href);
-                        url.searchParams.set('pago', 'ok');
-                        url.searchParams.set('n', '{nom}'); url.searchParams.set('ape', '{ap}');
-                        url.searchParams.set('u', '{usr}'); url.searchParams.set('id', '{idx}');
-                        url.searchParams.set('em', '{cor}');
-                        window.location.href = url.href;
+                        alert('¡Pago completado con éxito, ' + details.payer.name.given_name + '!');
+                        window.location.href = window.location.origin + "/?view=registro&pago=exito";
                     }});
                 }}
             }}).render('#paypal-button-container');
@@ -116,60 +99,15 @@ if es_seguidor:
         """
         components.html(paypal_html, height=500)
 
-        if params.get("pago") == "ok":
-            with st.spinner("Registrando..."):
-                if registrar_pago(params.get("n"), params.get("ape"), params.get("u"), params.get("id"), params.get("em")):
-                    st.balloons()
-                    st.success("¡LISTO! Ya estás en la lista.")
-                    time.sleep(3)
-                    st.query_params.clear()
-                    st.query_params.update({"view": "registro"})
-
-# ==========================================
-# VISTA TONY (STREAM)
-# ==========================================
 else:
-    st.sidebar.title("🔐 Admin")
+    # VISTA ADMIN (Toda la lógica de visualización que ya tenías)
+    st.sidebar.title("Admin")
     if st.sidebar.text_input("Clave", type="password") == CLAVE_ADMIN:
-        mode = st.sidebar.radio("Modo", ["📺 Stream", "⚙️ Ajustes"])
+        st.title("📺 Panel de Control - Stream")
+        df = leer_datos()
         
-        if mode == "📺 Stream":
-            st.header(f"🏆 Rifa: {st.session_state.config['premio']}")
-            df = leer_datos()
-            total = len(df)
-            meta = st.session_state.config['meta']
-            
-            c1, c2 = st.columns(2)
-            c1.metric("Participantes", f"{total} / {meta}")
-            c2.progress(min(total/meta, 1.0) if meta > 0 else 0)
-            
-            st.divider()
-            
-            if not df.empty:
-                st.subheader("Lista de Participantes")
-                
-                # --- AQUÍ ESTÁ EL TRUCO PARA EL NOMBRE Y EL NÚMERO ---
-                # Creamos una lista limpia para mostrar en el Stream
-                lineas_participantes = []
-                
-                # Recorremos el DataFrame (el Excel) fila por fila
-                for index, row in df.iterrows():
-                    numero_llegada = index + 1
-                    nombre_completo = f"{row['Nombre']} {row['Apellido']}"
-                    # Formato: "1. Tony Jimenez - ¡Está participando!"
-                    linea = f"### **{numero_llegada}. {nombre_completo}** — *¡Está participando!* ✅"
-                    lineas_participantes.append(linea)
-                
-                # Invertimos la lista para que el último que llegó salga arriba (opcional)
-                # Si prefieres que el 1 salga arriba, quita el [::-1]
-                for p in lineas_participantes[::-1]:
-                    st.markdown(p)
-            
-            else:
-                st.write("Esperando al primer valiente... 🔎")
-            
-            if st.button("🎰 SORTEAR"):
-                if total > 0:
-                    ganador = random.choice(df['Nombre'].tolist())
-                    st.header(f"🎊 ¡GANADOR: {ganador.upper()}! 🎊")
-                    st.balloons()
+        if not df.empty:
+            for index, row in df.iterrows():
+                st.markdown(f"### **{index + 1}. {row['Nombre']} {row['Apellido']}** — ID: {row['ID']} ✅")
+        else:
+            st.write("Sin participantes aún.")
