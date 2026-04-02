@@ -52,7 +52,7 @@ def registrar_pago(n, ape, u, i, em):
 
 # --- 3. LÓGICA DE NAVEGACIÓN ---
 if 'config' not in st.session_state:
-    st.session_state.config = {"meta": 25, "precio": "1.00", "premio": "Premio Especial"}
+    st.session_state.config = {"meta": 25, "precio": "1.00", "premio": "Insecto sinergia V (35.000 monedas de hormiga)"}
 
 params = st.query_params
 es_seguidor = params.get("view") == "registro"
