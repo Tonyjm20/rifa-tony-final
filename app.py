@@ -57,7 +57,7 @@ if es_seguidor:
         <script>
             paypal.Buttons({{
                 createOrder: function(data, actions) {{
-                    return actions.order.create({{ purchase_units: [{{ amount: {{ value: '10.00' }} }}] }});
+                    return actions.order.create({{ purchase_units: [{{ amount: {{ value: '20.00' }} }}] }});
                 }},
                 onApprove: function(data, actions) {{
                     return actions.order.capture().then(function(details) {{
