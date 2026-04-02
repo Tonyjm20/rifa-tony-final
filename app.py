@@ -2,89 +2,97 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import random
-import time
 
 # --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="Panel Limpio Tony AFK", layout="wide")
+st.set_page_config(page_title="Panel VIP Tony AFK", layout="wide")
 
-LINK_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx5dTlNFD_aegJHRA_MTKHp3S6JAkgCQdUQaiLKlJpvdI5HpMqNZDDWHMlUvjPPHFqUzbSTy1xNpxg/pub?output=csv"
+# Datos de conexión directa
+ID_SHEET = "1zBwqiaFjT3RfnAA19BBE37AHFGaz6oQZM2C3aVJC2uE"
 CLAVE_ADMIN = "tonyjm20"
 CLIENT_ID_PAYPAL = "Aet4fqbdIlo68fTo3U7WcXax3B9UpCQI8QupSmw3IFBAw-OKF1A4XCcRvBS19VIh7e7MeQyicvqjCIQl"
 
-# Conexión oficial
+# Conexión oficial de Streamlit para Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- FUNCIÓN DE LECTURA SIN MEMORIA (TTL=0) ---
-def leer_datos_limpios():
-    # 1. Limpiamos cualquier rastro de memoria vieja de Streamlit
+# --- FUNCIÓN DE LECTURA DIRECTA (SIN CACHÉ) ---
+def leer_datos_reales():
+    # Eliminamos el caché de Streamlit por completo
     st.cache_data.clear()
     try:
-        # 2. Forzamos a Google a darnos el archivo nuevo con un número aleatorio
-        url_fresca = f"{LINK_CSV}&nocache={time.time()}"
-        df = pd.read_csv(url_fresca)
-        df.columns = [c.strip() for c in df.columns]
+        # Leemos directamente de la hoja usando la URL de edición (Interna)
+        # Esto no pasa por los servidores de "Publicar en la web", es directo a tu archivo
+        url_interna = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/edit#gid=0"
+        df = conn.read(spreadsheet=url_interna, worksheet="Hoja1", ttl=0)
+        # Limpiamos nombres de columnas
+        df.columns = [str(c).strip() for c in df.columns]
         return df
-    except:
-        # 3. Si el CSV falla, usamos la conexión oficial pero con TTL=0 (Sin caché)
-        return conn.read(worksheet="Hoja1", ttl=0)
+    except Exception as e:
+        st.error(f"Error de conexión directa: {e}")
+        return pd.DataFrame(columns=["Nombre", "Apellido", "User", "ID", "Email", "Fecha"])
 
-# --- MANEJO DE SESIÓN ---
-if 'admin_auth' not in st.session_state:
-    st.session_state['admin_auth'] = False
+# --- MANEJO DE SESIÓN PERSISTENTE ---
+if 'autenticado' not in st.session_state:
+    st.session_state['autenticado'] = False
 
 # --- LÓGICA DE VISTAS ---
 params = st.query_params
 es_seguidor = params.get("view") == "registro"
 
 if es_seguidor:
-    st.title("🎟️ Registro y Pago")
-    # [Bloque de registro intacto]
+    st.title("🎟️ Registro para el Sorteo")
+    # [Aquí mantén tu bloque de PayPal y formulario]
 else:
-    if not st.session_state['admin_auth']:
-        st.sidebar.title("🔐 Acceso")
-        pass_input = st.sidebar.text_input("Clave", type="password")
-        if st.sidebar.button("Entrar"):
+    # --- VISTA ADMIN ---
+    if not st.session_state['autenticado']:
+        st.sidebar.title("🔐 Acceso Admin")
+        pass_input = st.sidebar.text_input("Clave de Acceso", type="password")
+        if st.sidebar.button("Entrar al Panel"):
             if pass_input == CLAVE_ADMIN:
-                st.session_state['admin_auth'] = True
+                st.session_state['autenticado'] = True
                 st.rerun()
             else:
                 st.error("Clave incorrecta")
     else:
-        st.title("📺 Panel de Control (Datos Reales)")
+        st.title("📺 Panel de Control - Transmisión en Vivo")
         
-        st.sidebar.header("⚙️ Controles")
-        meta = st.sidebar.number_input("Meta", min_value=1, value=50)
+        # CONTROLES EN SIDEBAR
+        st.sidebar.header("🕹️ Controles")
+        meta = st.sidebar.number_input("Meta de Participantes", min_value=1, value=50)
         
-        # BOTÓN DE REFRESCO QUE LIMPIA TODO
-        if st.sidebar.button("🔄 REFRESCAR Y LIMPIAR", type="primary", use_container_width=True):
-            # Al picar aquí, la función leer_datos_limpios() hará el trabajo
-            st.rerun() 
+        # BOTÓN DE ACTUALIZACIÓN MANUAL (ÚNICA FORMA DE EVITAR EL PARPADEO)
+        if st.sidebar.button("🔄 ACTUALIZAR LISTA", type="primary", use_container_width=True):
+            st.rerun()
 
         st.sidebar.divider()
         btn_sorteo = st.sidebar.button("🎰 REALIZAR SORTEO", use_container_width=True)
         
-        # LECTURA DE DATOS
-        df = leer_datos_limpios()
+        # --- LECTURA Y VISUALIZACIÓN ---
+        df = leer_datos_reales()
         total = len(df)
         
         # Barra de progreso
         st.progress(min(total / meta, 1.0))
-        st.subheader(f"📊 Participantes confirmados: {total} / {meta}")
+        st.subheader(f"📊 Estado: {total} de {meta} participantes")
         
         st.divider()
-        
+
         if not df.empty:
+            # Mostramos la lista
             for index, row in df.iterrows():
-                st.markdown(f"### **{index + 1}. {row['Nombre']} {row['Apellido']}** — ✅")
+                nombre_completo = f"{row.get('Nombre', '')} {row.get('Apellido', '')}"
+                st.markdown(f"### **{index + 1}. {nombre_completo}** — ✅")
             
+            st.divider()
+            
+            # Sorteo
             if btn_sorteo:
                 ganador = random.choice(df['Nombre'].tolist())
                 st.balloons()
-                st.success(f"🎊 ¡GANADOR: {ganador.upper()}! 🎊")
+                st.success(f"🎊 ¡TENEMOS UN GANADOR! 🎊")
                 st.title(f"🏆 {ganador.upper()} 🏆")
         else:
-            st.info("No hay datos nuevos. Asegúrate de que el Excel esté actualizado y presiona el botón de refrescar.")
+            st.info("No hay datos registrados. Actualiza el Excel y pulsa el botón.")
 
         if st.sidebar.button("Cerrar Sesión"):
-            st.session_state['admin_auth'] = False
+            st.session_state['autenticado'] = False
             st.rerun()
