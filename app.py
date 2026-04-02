@@ -15,7 +15,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 def leer_datos():
     try:
         # Leemos la Hoja 1. ttl=0 evita que Streamlit use memoria vieja.
-        return conn.read(worksheet="Hoja 1", ttl=0)
+        return conn.read(worksheet="Rifa_TonyJM", ttl=0)
     except Exception as e:
         st.error(f"Error al leer la base de datos: {e}")
         return pd.DataFrame(columns=["Nombre", "Apellido", "User", "ID", "Email", "Fecha"])
@@ -43,7 +43,7 @@ def registrar_en_sheets(nombre, apellido, user_game, id_game, email):
 
 # --- 3. CONFIGURACIÓN DEL SORTEO ---
 if 'config' not in st.session_state:
-    st.session_state.config = {"meta": 50, "precio": "10.00", "premio": "Insecto Especial"}
+    st.session_state.config = {"meta": 25, "precio": "1.00", "premio": "Insecto Especial"}
 
 # REEMPLAZA ESTO CON TU CLIENT ID DE PAYPAL
 CLIENT_ID_PAYPAL = "Aet4fqbdIlo68fTo3U7WcXax3B9UpCQI8QupSmw3IFBAw-OKF1A4XCcRvBS19VIh7e7MeQyicvqjCIQl"
