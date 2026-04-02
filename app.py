@@ -2,91 +2,89 @@ import streamlit as st
 import pandas as pd
 import random
 import time
-import urllib.request
 
 # --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="Rifa Tony AFK - Estable", layout="wide")
+st.set_page_config(page_title="Rifa Tony AFK - Panel Pro", layout="wide")
 
+# Tus credenciales
 LINK_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx5dTlNFD_aegJHRA_MTKHp3S6JAkgCQdUQaiLKlJpvdI5HpMqNZDDWHMlUvjPPHFqUzbSTy1xNpxg/pub?output=csv"
 CLAVE_ADMIN = "tonyjm20"
 
-# --- FUNCIÓN DE LECTURA "ANTI-FANTASMA" ---
+# --- FUNCIÓN DE LECTURA SIMPLE (LA ORIGINAL) ---
 def leer_datos():
-    # 1. Borramos la memoria de Streamlit
+    # Limpiamos la caché de Streamlit para forzar lectura nueva
     st.cache_data.clear()
-    
-    # 2. Creamos un link ÚNICO para cada segundo para engañar a Google
-    # Añadimos un timestamp y un número aleatorio
-    url_final = f"{LINK_CSV}&refresh={time.time()}&rand={random.randint(1, 1000)}"
-    
     try:
-        # 3. Usamos una técnica más fuerte para pedir el archivo (Request con Headers)
-        # Esto le dice a los servidores de Google: "Prohibido usar caché"
-        req = urllib.request.Request(
-            url_final, 
-            headers={'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
-        )
-        
-        with urllib.request.urlopen(req) as response:
-            df = pd.read_csv(response)
-            df.columns = [c.strip() for c in df.columns]
-            return df
-    except Exception as e:
-        # Si falla el método fuerte, usamos el normal de respaldo
-        try:
-            return pd.read_csv(url_final)
-        except:
-            return pd.DataFrame(columns=["Nombre", "Apellido", "User", "ID", "Email", "Fecha"])
+        # Añadimos un pequeño truco al link para que Google no se quede pegado
+        url_fresca = f"{LINK_CSV}&t={int(time.time())}"
+        df = pd.read_csv(url_fresca)
+        df.columns = [c.strip() for c in df.columns]
+        return df
+    except:
+        return pd.DataFrame(columns=["Nombre", "Apellido", "User", "ID", "Email", "Fecha"])
 
-# --- MANEJO DE SESIÓN (PARA NO PEDIR CLAVE) ---
+# --- MANEJO DE SESIÓN (PARA NO PEDIR CLAVE CADA VEZ) ---
 if 'auth' not in st.session_state:
     st.session_state['auth'] = False
 
-# --- LÓGICA DEL PANEL ---
-if not st.session_state['auth']:
-    st.sidebar.title("🔐 Acceso Admin")
-    pw = st.sidebar.text_input("Clave", type="password")
-    if st.sidebar.button("Entrar"):
-        if pw == CLAVE_ADMIN:
-            st.session_state['auth'] = True
-            st.rerun()
-        else:
-            st.error("Clave incorrecta")
+# --- NAVEGACIÓN ---
+params = st.query_params
+es_seguidor = params.get("view") == "registro"
+
+if es_seguidor:
+    # --- VISTA SEGUIDOR ---
+    st.title("🎟️ Registro para el Sorteo")
+    # (Aquí mantén tu bloque de PayPal y formulario que ya tienes)
 else:
-    # --- PANEL ADMIN ---
-    st.title("📺 Panel de Control - Datos en Tiempo Real")
-    
-    st.sidebar.header("⚙️ Controles")
-    meta = st.sidebar.number_input("Meta", min_value=1, value=50)
-    
-    # Este botón ahora limpia hasta el último rastro de memoria
-    if st.sidebar.button("🔄 REFRESCAR LISTA", type="primary", use_container_width=True):
-        st.rerun()
-
-    st.sidebar.divider()
-    btn_sorteo = st.sidebar.button("🎰 REALIZAR SORTEO", use_container_width=True)
-
-    # Lectura de datos con la nueva lógica
-    df = leer_datos()
-    total = len(df)
-    
-    st.progress(min(total / meta, 1.0))
-    st.subheader(f"📊 Participantes: {total} / {meta}")
-    
-    st.divider()
-    
-    if not df.empty:
-        for index, row in df.iterrows():
-            st.markdown(f"### **{index + 1}. {row['Nombre']} {row['Apellido']}** — ✅")
-        
-        if btn_sorteo:
-            ganador = random.choice(df['Nombre'].tolist())
-            st.balloons()
-            st.success(f"🎊 GANADOR: {ganador.upper()} 🎊")
-            st.title(f"🏆 {ganador.upper()} 🏆")
+    # --- VISTA ADMIN ---
+    if not st.session_state['auth']:
+        st.sidebar.title("🔐 Acceso Admin")
+        pw = st.sidebar.text_input("Clave", type="password")
+        if st.sidebar.button("Entrar"):
+            if pw == CLAVE_ADMIN:
+                st.session_state['auth'] = True
+                st.rerun()
+            else:
+                st.error("Clave incorrecta")
     else:
-        st.info("Esperando datos... Si acabas de anotar a alguien, espera 5 segundos y refresca.")
+        # --- PANEL DE CONTROL ---
+        st.title("📺 Panel de Transmisión")
+        
+        # Barra lateral con controles
+        st.sidebar.header("⚙️ Controles")
+        meta = st.sidebar.number_input("Meta de Sorteo", min_value=1, value=50)
+        
+        # BOTÓN DE ACTUALIZAR (Este refresca sin pedir clave)
+        if st.sidebar.button("🔄 ACTUALIZAR LISTA", type="primary", use_container_width=True):
+            st.rerun()
 
-    if st.sidebar.button("Cerrar Sesión"):
-        st.session_state['auth'] = False
-        st.rerun()
+        st.sidebar.divider()
+        btn_sorteo = st.sidebar.button("🎰 REALIZAR SORTEO", use_container_width=True)
+
+        # Cargar los datos
+        df = leer_datos()
+        total = len(df)
+        
+        # BARRA DE PROGRESO
+        st.progress(min(total / meta, 1.0))
+        st.subheader(f"📊 Participantes: {total} / {meta}")
+        
+        st.divider()
+        
+        if not df.empty:
+            # Lista de participantes
+            for index, row in df.iterrows():
+                st.markdown(f"### **{index + 1}. {row['Nombre']} {row['Apellido']}** — ✅")
+            
+            # Botón de Sorteo
+            if btn_sorteo:
+                ganador = random.choice(df['Nombre'].tolist())
+                st.balloons()
+                st.success(f"🎊 ¡TENEMOS UN GANADOR! 🎊")
+                st.title(f"🏆 {ganador.upper()} 🏆")
+        else:
+            st.info("Lista vacía. Pulsa 'Actualizar Lista' cuando haya nuevos registros.")
+
+        if st.sidebar.button("Cerrar Sesión"):
+            st.session_state['auth'] = False
+            st.rerun()
