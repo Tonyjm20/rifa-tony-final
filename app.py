@@ -128,20 +128,32 @@ else:
             c2.progress(min(total/meta, 1.0) if meta > 0 else 0)
             
             st.divider()
+            
             if not df.empty:
-                # Mostramos Nombre y User para el stream
-                st.table(df[["Nombre", "User", "Fecha"]].iloc[::-1])
+                st.subheader("Lista de Participantes")
+                
+                # --- AQUÍ ESTÁ EL TRUCO PARA EL NOMBRE Y EL NÚMERO ---
+                # Creamos una lista limpia para mostrar en el Stream
+                lineas_participantes = []
+                
+                # Recorremos el DataFrame (el Excel) fila por fila
+                for index, row in df.iterrows():
+                    numero_llegada = index + 1
+                    nombre_completo = f"{row['Nombre']} {row['Apellido']}"
+                    # Formato: "1. Tony Jimenez - ¡Está participando!"
+                    linea = f"### **{numero_llegada}. {nombre_completo}** — *¡Está participando!* ✅"
+                    lineas_participantes.append(linea)
+                
+                # Invertimos la lista para que el último que llegó salga arriba (opcional)
+                # Si prefieres que el 1 salga arriba, quita el [::-1]
+                for p in lineas_participantes[::-1]:
+                    st.markdown(p)
+            
+            else:
+                st.write("Esperando al primer valiente... 🔎")
             
             if st.button("🎰 SORTEAR"):
                 if total > 0:
                     ganador = random.choice(df['Nombre'].tolist())
-                    st.header(f"🎊 GANADOR: {ganador} 🎊")
+                    st.header(f"🎊 ¡GANADOR: {ganador.upper()}! 🎊")
                     st.balloons()
-        
-        elif mode == "⚙️ Ajustes":
-            st.session_state.config['premio'] = st.text_input("Premio", value=st.session_state.config['premio'])
-            st.session_state.config['meta'] = st.number_input("Meta", value=st.session_state.config['meta'])
-            st.session_state.config['precio'] = st.text_input("Precio", value=st.session_state.config['precio'])
-            if st.button("Limpiar Lista"):
-                conn.update(worksheet="Hoja1", data=pd.DataFrame(columns=["Nombre", "Apellido", "User", "ID", "Email", "Fecha"]))
-                st.rerun()
