@@ -12,7 +12,7 @@ if 'participantes' not in st.session_state:
 if 'config' not in st.session_state:
     st.session_state.config = {
         "meta": 25, 
-        "precio": "20.00", 
+        "precio": "1.00", 
         "premio": "Insecto Especial Sinergia V"
     }
 
