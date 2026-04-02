@@ -6,7 +6,7 @@ import time
 import streamlit.components.v1 as components
 
 # --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="Rifa Tony AFK", layout="wide")
+st.set_page_config(page_title="Rifa Tony", layout="wide")
 
 # SUSTITUYE ESTO POR TU ENLACE DE "PUBLICAR EN LA WEB" (EL QUE TERMINA EN .csv)
 LINK_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx5dTlNFD_aegJHRA_MTKHp3S6JAkgCQdUQaiLKlJpvdI5HpMqNZDDWHMlUvjPPHFqUzbSTy1xNpxg/pub?output=csv"
@@ -52,7 +52,7 @@ def registrar_pago(n, ape, u, i, em):
 
 # --- 3. LÓGICA DE NAVEGACIÓN ---
 if 'config' not in st.session_state:
-    st.session_state.config = {"meta": 50, "precio": "10.00", "premio": "Premio Especial"}
+    st.session_state.config = {"meta": 25, "precio": "1.00", "premio": "Premio Especial"}
 
 params = st.query_params
 es_seguidor = params.get("view") == "registro"
