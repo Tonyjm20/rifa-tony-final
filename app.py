@@ -8,7 +8,8 @@ import streamlit.components.v1 as components
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Rifa Tony AFK", layout="wide")
 
-# 1. Enlace de lectura pública (El que termina en .csv)
+# 1. Enlace de lectura pública (El que termina en .csv de "Publicar en la web")
+# REEMPLAZA EL LINK DE ABAJO CON EL TUYO
 LINK_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSx5dTlNFD_aegJHRA_MTKHp3S6JAkgCQdUQaiLKlJpvdI5HpMqNZDDWHMlUvjPPHFqUzbSTy1xNpxg/pub?output=csv"
 ID_SHEET = "1zBwqiaFjT3RfnAA19BBE37AHFGaz6oQZM2C3aVJC2uE"
 CLAVE_ADMIN = "tonyjm20"
@@ -34,7 +35,6 @@ def guardar_registro_forzado(n, ape, u, i, em):
             "ID": i, "Email": em, "Fecha": time.strftime("%d/%m/%Y %H:%M:%S")
         }])
         df_final = pd.concat([df_actual, nueva_fila], ignore_index=True)
-        # Intentamos guardar directamente
         conn.update(worksheet="Hoja1", data=df_final)
         st.cache_data.clear()
         return True
@@ -49,7 +49,6 @@ es_seguidor = params.get("view") == "registro"
 if es_seguidor:
     st.header("🎟️ Registro para el Sorteo")
     
-    # Formulario de datos
     with st.form("datos_usuario"):
         c1, c2 = st.columns(2)
         with c1:
@@ -60,12 +59,11 @@ if es_seguidor:
             usuario = st.text_input("User del Juego")
             id_juego = st.text_input("ID del Juego")
         
-        # EL CAMBIO CLAVE: El botón de registrar ahora guarda los datos PRIMERO
         enviar_datos = st.form_submit_button("1. Registrar mis datos")
 
     if enviar_datos:
         if nombre and id_juego and email:
-            con exito = guardar_registro_forzado(nombre, apellido, usuario, id_juego, email)
+            exito = guardar_registro_forzado(nombre, apellido, usuario, id_juego, email)
             if exito:
                 st.success("✅ Datos guardados. Ahora procede al pago para validar tu participación.")
                 st.session_state['datos_listos'] = True
@@ -74,7 +72,6 @@ if es_seguidor:
         else:
             st.warning("Por favor, llena todos los campos.")
 
-    # 2. SECCIÓN DE PAGO (Solo aparece si se guardaron los datos)
     if st.session_state.get('datos_listos'):
         st.divider()
         st.info("💰 Paso final: Realiza el pago de $10.00 USD")
@@ -89,7 +86,7 @@ if es_seguidor:
                 }},
                 onApprove: function(data, actions) {{
                     return actions.order.capture().then(function(details) {{
-                        alert('¡Pago completado con éxito, ' + details.payer.name.given_name + '!');
+                        alert('¡Pago completado con éxito!');
                         window.location.href = window.location.origin + "/?view=registro&pago=exito";
                     }});
                 }}
@@ -99,7 +96,6 @@ if es_seguidor:
         components.html(paypal_html, height=500)
 
 else:
-    # VISTA ADMIN (Toda la lógica de visualización que ya tenías)
     st.sidebar.title("Admin")
     if st.sidebar.text_input("Clave", type="password") == CLAVE_ADMIN:
         st.title("📺 Panel de Control - Stream")
