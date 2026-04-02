@@ -35,19 +35,35 @@ def leer_datos():
 
 def registrar_pago(n, ape, u, i, em):
     try:
-        # Leemos el estado actual
+        # 1. Limpiamos los datos de espacios raros
+        n, ape, u, i, em = [str(x).strip() for x in [n, ape, u, i, em]]
+        
+        # 2. Obtenemos los datos actuales para no borrar nada
         df_actual = leer_datos()
+        
+        # 3. Creamos la nueva fila con la estructura exacta de tu Excel
         nueva_fila = pd.DataFrame([{
-            "Nombre": n, "Apellido": ape, "User": u, 
-            "ID": i, "Email": em, "Fecha": time.strftime("%d/%m/%Y %H:%M:%S")
+            "Nombre": n, 
+            "Apellido": ape, 
+            "User": u, 
+            "ID": i, 
+            "Email": em, 
+            "Fecha": time.strftime("%d/%m/%Y %H:%M:%S")
         }])
+        
+        # 4. Unimos y subimos (IMPORTANTE: Verifica que en Sheets la pestaña sea 'Hoja1')
         df_final = pd.concat([df_actual, nueva_fila], ignore_index=True)
-        # Escribimos usando la conexión oficial (Requiere que los Secrets estén bien)
+        
+        # Intentamos la actualización forzada
         conn.update(worksheet="Hoja1", data=df_final)
+        
+        # 5. Limpiamos TODA la memoria para que el cambio se vea al instante
         st.cache_data.clear()
+        st.cache_resource.clear()
         return True
     except Exception as e:
-        st.error(f"Error al guardar: {e}")
+        # Si sale este error en tu consola, es que los Secrets (la llave) siguen mal
+        st.error(f"Error de escritura en Google Sheets: {e}")
         return False
 
 # --- 3. LÓGICA DE NAVEGACIÓN ---
