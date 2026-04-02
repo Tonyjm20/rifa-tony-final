@@ -13,10 +13,8 @@ CLIENT_ID_PAYPAL = "Aet4fqbdIlo68fTo3U7WcXax3B9UpCQI8QupSmw3IFBAw-OKF1A4XCcRvBS1
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- FUNCIÓN DE LECTURA (Cero Caché) ---
 def leer_datos():
     try:
-        # El parámetro t= asegura que Google no nos de datos viejos
         url_fresca = f"{LINK_CSV}&t={int(time.time())}"
         df = pd.read_csv(url_fresca)
         df.columns = [c.strip() for c in df.columns]
@@ -24,7 +22,7 @@ def leer_datos():
     except:
         return pd.DataFrame(columns=["Nombre", "Apellido", "User", "ID", "Email", "Fecha"])
 
-# --- MANEJO DE SESIÓN ---
+# --- SESIÓN ---
 if 'autenticado' not in st.session_state:
     st.session_state['autenticado'] = False
 
@@ -33,10 +31,9 @@ params = st.query_params
 es_seguidor = params.get("view") == "registro"
 
 if es_seguidor:
-    # --- VISTA SEGUIDOR (Registro y Pago) ---
+    # --- VISTA SEGUIDOR (PAGO) ---
     st.title("🎟️ Registro para el Sorteo")
-    # [Aquí va tu bloque de registro y PayPal que ya funciona]
-    
+    # (Aquí mantén tu bloque de PayPal y formulario que ya funciona)
 else:
     # --- VISTA ADMIN ---
     if not st.session_state['autenticado']:
@@ -49,41 +46,43 @@ else:
             else:
                 st.error("Incorrecto")
     else:
-        # --- PANEL EN VIVO (ESTO ES LO QUE NO PARPADEA) ---
-        st.title("📺 Panel de Transmisión (Auto-Update)")
+        st.title("📺 Panel de Transmisión (Auto-Refresh)")
         
-        meta = st.sidebar.number_input("Meta", min_value=1, value=50)
-        
-        # Usamos un contenedor vacío para actualizar solo el contenido
-        placeholder = st.empty()
+        meta = st.sidebar.number_input("Meta de Sorteo", min_value=1, value=50)
 
-        # Bucle de actualización suave (sin recargar la página)
-        while True:
-            with placeholder.container():
-                df = leer_datos()
-                total = len(df)
-                
-                # Barra y Métricas
-                st.progress(min(total / meta, 1.0))
-                st.subheader(f"📊 Participantes: {total} / {meta}")
-                
-                st.divider()
-                
-                if not df.empty:
-                    # Mostramos los participantes
-                    for index, row in df.iterrows():
-                        st.write(f"### {index + 1}. {row['Nombre']} {row['Apellido']} — ✅")
-                    
-                    st.divider()
-                    # Botón de sorteo (este detendrá el bucle para mostrar al ganador)
-                    if st.button("🎰 SORTEAR AHORA"):
-                        ganador = random.choice(df['Nombre'].tolist())
-                        st.header(f"🎊 ¡GANADOR: {ganador.upper()}! 🎊")
-                        st.balloons()
-                        st.stop() # Pausa el refresco para que se vea el ganador
-                else:
-                    st.info("Esperando nuevos registros...")
+        # --- ZONA QUE SE ACTUALIZA SOLA (FRAGMENTO) ---
+        @st.fragment(run_every=5) # <--- AQUÍ ESTÁ LA MAGIA: Actualiza cada 5s sin parpadear
+        def mostrar_lista_viva():
+            datos = leer_datos()
+            total = len(datos)
             
-            # Tiempo de espera entre actualizaciones (5 segundos)
-            time.sleep(5)
-            # st.rerun() no es necesario aquí porque el while refresca el container
+            # Barra de progreso
+            st.progress(min(total / meta, 1.0))
+            st.subheader(f"📊 Participantes: {total} / {meta}")
+            
+            st.divider()
+            
+            if not datos.empty:
+                for index, row in datos.iterrows():
+                    st.markdown(f"### **{index + 1}. {row['Nombre']} {row['Apellido']}** — ✅")
+            else:
+                st.info("Esperando registros...")
+        
+        # Llamamos al fragmento
+        mostrar_lista_viva()
+
+        # --- BOTÓN DE SORTEO (FUERA DEL FRAGMENTO PARA QUE NO DE ERROR) ---
+        st.sidebar.divider()
+        if st.sidebar.button("🎰 REALIZAR SORTEO", type="primary"):
+            df_para_sorteo = leer_datos()
+            if not df_para_sorteo.empty:
+                ganador = random.choice(df_para_sorteo['Nombre'].tolist())
+                st.balloons()
+                st.success(f"🎊 ¡TENEMOS UN GANADOR! 🎊")
+                st.title(f"🏆 {ganador.upper()} 🏆")
+            else:
+                st.sidebar.warning("No hay nadie para sortear aún.")
+
+        if st.sidebar.button("Cerrar Sesión"):
+            st.session_state['autenticado'] = False
+            st.rerun()
