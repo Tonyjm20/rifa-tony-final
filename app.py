@@ -12,13 +12,30 @@ st.set_page_config(page_title="Rifa Tony AFK", layout="wide")
 # Conexión configurada para leer en tiempo real (ttl=0)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# --- 1. DEFINIR EL LINK PÚBLICO (Copia esto tal cual) ---
+# Este link convierte tu Excel en un archivo que Python lee al instante
+ID_HOJA = "1zBwqiaFjT3RfnAA19BBE37AHFGaz6oQZM2C3aVJC2uE"
+URL_LECTURA = f"https://docs.google.com/spreadsheets/d/{ID_HOJA}/gviz/tq?tqx=out:csv&sheet=Hoja1"
+
+# --- 2. LA FUNCIÓN DE LECTURA CORREGIDA ---
 def leer_datos():
     try:
-        # Leemos la Hoja 1. ttl=0 evita que Streamlit use memoria vieja.
-        return conn.read(worksheet="Rifa_TonyJM", ttl=0)
+        # Intentamos leer por la vía rápida (Link Público)
+        # index_col=False evita errores de columnas movidas
+        df = pd.read_csv(URL_LECTURA, index_col=False)
+        
+        # Si el Excel está vacío, creamos las columnas para que no de error
+        if df.empty:
+            return pd.DataFrame(columns=["Nombre", "Apellido", "User", "ID", "Email", "Fecha"])
+            
+        return df
     except Exception as e:
-        st.error(f"Error al leer la base de datos: {e}")
-        return pd.DataFrame(columns=["Nombre", "Apellido", "User", "ID", "Email", "Fecha"])
+        # Si falla la vía rápida, intentamos con la conexión oficial
+        try:
+            return conn.read(worksheet="Hoja1", ttl=0)
+        except:
+            st.error(f"Error crítico de base de datos: {e}")
+            return pd.DataFrame(columns=["Nombre", "Apellido", "User", "ID", "Email", "Fecha"])
 
 def registrar_en_sheets(nombre, apellido, user_game, id_game, email):
     try:
